@@ -17,7 +17,12 @@ namespace BulkOperation
         {
             _database = database;
         }
-
+        /// <summary>
+        /// Insert parent child(if exist) in database using SQL bulk copy 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="list"></param>
+        /// <param name="parentTableName"></param>
         public void BulkInsert<T>(IEnumerable<T> list, string parentTableName) where T : class
         {
             using (SqlConnection conn = new SqlConnection(_database.Connection.ConnectionString))
@@ -45,6 +50,7 @@ namespace BulkOperation
                                     if (attr != null)
                                     {
                                         Type propertyType;
+                                        //// check if nullable type if yes then select type 
                                         if (prop.PropertyType.IsGenericType &&
                                             prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
                                         {
@@ -64,6 +70,7 @@ namespace BulkOperation
                                     childBulkCopy.DestinationTableName = childAttrs.Name;
                                     var childObject = prop.PropertyType;
                                     Type childObjectType;
+                                    //// check if child type is single object or list of object
                                     if (childObject.Name.Contains("ICollection"))
                                     {
                                         childObjectType = childObject.GetGenericArguments().FirstOrDefault();
@@ -103,9 +110,9 @@ namespace BulkOperation
                                                 }
                                             }
                                         }
-                                        for (int ii = 0; ii < items.Count; ii++)
+                                        for (int itemIndex = 0; itemIndex < items.Count; itemIndex++)
                                         {
-                                            dynamic childItems = items[ii].GetType().GetProperty(prop.Name).GetValue(items[ii], null);
+                                            dynamic childItems = items[itemIndex].GetType().GetProperty(prop.Name).GetValue(items[itemIndex], null);
                                             var isEnumerable = (childItems as System.Collections.IEnumerable) != null;
                                             if (isEnumerable)
                                             {
@@ -117,14 +124,14 @@ namespace BulkOperation
                                                         object value = null;
                                                         if (parentName == childColumnNames[j])
                                                         {
-                                                            PropertyInfo[] parentProps = items[ii].GetType().GetProperties();
+                                                            PropertyInfo[] parentProps = items[itemIndex].GetType().GetProperties();
                                                             foreach (PropertyInfo pProp in parentProps)
                                                             {
                                                                 object[] parentAttributes = pProp.GetCustomAttributes(true);
                                                                 var parentAttrs = parentAttributes.FirstOrDefault(x => x.GetType() == typeof(KeyAttribute));
                                                                 if (parentAttrs != null)
                                                                 {
-                                                                    value = items[ii].GetType().GetProperty(pProp.Name).GetValue(items[ii], null);
+                                                                    value = items[itemIndex].GetType().GetProperty(pProp.Name).GetValue(items[itemIndex], null);
                                                                 }
                                                             }
                                                         }
@@ -156,6 +163,10 @@ namespace BulkOperation
                                                     {
                                                         ////assign the value
                                                         dataItems.Add(value);
+                                                    }
+                                                    else
+                                                    {
+                                                        dataItems.Add(DBNull.Value);
                                                     }
                                                 }
                                                 childTable.Rows.Add(dataItems.ToArray());
@@ -191,7 +202,13 @@ namespace BulkOperation
                 }
             }
         }
-
+        /// <summary>
+        /// Insert parent child(if exist) in database using SQL bulk copy with batch parameters
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="list"></param>
+        /// <param name="parentTableName"></param>
+        /// <param name="batchSize"></param>
         public void BulkInsert<T>(IEnumerable<T> list, string parentTableName, int batchSize) where T : class
         {
             using (SqlConnection conn = new SqlConnection(_database.Connection.ConnectionString))
@@ -221,6 +238,7 @@ namespace BulkOperation
                                     if (attr != null)
                                     {
                                         Type propertyType;
+                                        //// check if nullable type if yes then select type 
                                         if (prop.PropertyType.IsGenericType &&
                                             prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
                                         {
@@ -240,6 +258,7 @@ namespace BulkOperation
                                     childBulkCopy.DestinationTableName = childAttrs.Name;
                                     var childObject = prop.PropertyType;
                                     Type childObjectType;
+                                    //// check if child type is single object or list of object
                                     if (childObject.Name.Contains("ICollection"))
                                     {
                                         childObjectType = childObject.GetGenericArguments().FirstOrDefault();
@@ -279,9 +298,9 @@ namespace BulkOperation
                                                 }
                                             }
                                         }
-                                        for (int ii = 0; ii < items.Count; ii++)
+                                        for (int itemIndex = 0; itemIndex < items.Count; itemIndex++)
                                         {
-                                            dynamic childItems = items[ii].GetType().GetProperty(prop.Name).GetValue(items[ii], null);
+                                            dynamic childItems = items[itemIndex].GetType().GetProperty(prop.Name).GetValue(items[itemIndex], null);
                                             var isEnumerable = (childItems as System.Collections.IEnumerable) != null;
                                             if (isEnumerable)
                                             {
@@ -293,14 +312,14 @@ namespace BulkOperation
                                                         object value = null;
                                                         if (parentName == childColumnNames[j])
                                                         {
-                                                            PropertyInfo[] parentProps = items[ii].GetType().GetProperties();
+                                                            PropertyInfo[] parentProps = items[itemIndex].GetType().GetProperties();
                                                             foreach (PropertyInfo pProp in parentProps)
                                                             {
                                                                 object[] parentAttributes = pProp.GetCustomAttributes(true);
                                                                 var parentAttrs = parentAttributes.FirstOrDefault(x => x.GetType() == typeof(KeyAttribute));
                                                                 if (parentAttrs != null)
                                                                 {
-                                                                    value = items[ii].GetType().GetProperty(pProp.Name).GetValue(items[ii], null);
+                                                                    value = items[itemIndex].GetType().GetProperty(pProp.Name).GetValue(items[itemIndex], null);
                                                                 }
                                                             }
                                                         }
@@ -332,6 +351,10 @@ namespace BulkOperation
                                                     {
                                                         ////assign the value
                                                         dataItems.Add(value);
+                                                    }
+                                                    else
+                                                    {
+                                                        dataItems.Add(DBNull.Value);
                                                     }
                                                 }
                                                 childTable.Rows.Add(dataItems.ToArray());
@@ -367,6 +390,12 @@ namespace BulkOperation
                 }
             }
         }
+        /// <summary>
+        /// deletes data for given table data
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="dataList"></param>
+        /// <param name="tableName"></param>
         public void DeleteEntity<T>(IEnumerable<T> dataList, string tableName) where T : class
         {
             PropertyInfo[] props = typeof(T).GetProperties();
