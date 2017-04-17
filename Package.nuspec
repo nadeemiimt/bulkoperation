@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>BulkPackage</id>
-    <version>6.0.0</version>
+    <version>1.0.0.0</version>
     <title>BulkOperation</title>
     <authors>Nadeem</authors>
     <owners>Nadeem</owners>
@@ -12,9 +12,9 @@
     <description>Bulk insert and delete extension for visual studio.</description>
     <releaseNotes>Bulk insert and delete extension for visual studio for Entity 6.0.0.0 version</releaseNotes>
     <copyright>Copyright 2017</copyright>
-    <tags>bulkpackage Tag1 Tag2</tags>
+    <tags>bulkpackage</tags>
     <dependencies>
-      <dependency id="EntityFramework" version="6.0.0" />
+      <dependency id="EntityFramework" version="6.0.0.0" />
       <dependency id="System.ComponentModel.Annotations" version="4.0.0" />
     </dependencies>
   </metadata>
