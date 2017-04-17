@@ -1,6 +1,8 @@
 User manual:-
-1- This project uses ColumnAttribute and KeyAttribute of EF Entities to recognize child the library has custom ChildAttribute which need to be attached to child.
+
+1- This project uses ColumnAttribute and KeyAttribute of EF Entities. To recognize child the library has custom ChildAttribute which need to be attached to child.
 To use this library all POCO class should have Column and Key attributes and child attributes like as below:-
+
 public class ParentEntity
 {
 [Key, Column("parentId")]
