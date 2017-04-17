@@ -191,61 +191,183 @@ namespace BulkOperation
                 }
             }
         }
-        public void DeleteEntity<T>(IEnumerable<T> dataList, string tableName) where T : class
+
+        public void BulkInsert<T>(IEnumerable<T> list, string parentTableName, int batchSize) where T : class
         {
-            PropertyInfo[] props = typeof(T).GetProperties();
-            Type propertyType = null;
-            string primaryKeyName = "";
-            string keyName = "";
-            foreach (PropertyInfo prop in props)
+            using (SqlConnection conn = new SqlConnection(_database.Connection.ConnectionString))
             {
-                object[] attributes = prop.GetCustomAttributes(true);
-                var attrs = attributes.Where(x => x.GetType() == typeof(KeyAttribute)).ToList();
-                var columnAttrs = attributes.FirstOrDefault(x => x.GetType() == typeof(ColumnAttribute)) as ColumnAttribute;
-                foreach (KeyAttribute attr in attrs)
+                conn.Open();
+                using (SqlTransaction tran = conn.BeginTransaction())
                 {
-                    if (attr != null && columnAttrs != null)
+                    using (var bulkCopy = new SqlBulkCopy(_database.Connection.ConnectionString, SqlBulkCopyOptions.Default) { DestinationTableName = parentTableName })
                     {
-                        if (prop.PropertyType.IsGenericType &&
-                            prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        bulkCopy.BatchSize = batchSize;
+                        using (var childBulkCopy = new SqlBulkCopy(_database.Connection.ConnectionString, SqlBulkCopyOptions.Default))
                         {
-                            propertyType = prop.PropertyType.GetGenericArguments()[0];
+                            childBulkCopy.BatchSize = batchSize;
+                            var table = new DataTable();
+                            var childTable = new DataTable();
+                            var columnNames = new List<string>();
+                            var childColumnNames = new List<string>();
+                            var items = list.ToList();
+                            PropertyInfo[] props = typeof(T).GetProperties();
+                            foreach (PropertyInfo prop in props)
+                            {
+                                object[] attributes = prop.GetCustomAttributes(true);
+                                var attrs = attributes.Where(x => x.GetType() == typeof(ColumnAttribute)).ToList();
+                                ChildAttribute childAttrs = attributes.FirstOrDefault(x => x.GetType() == typeof(ChildAttribute)) as ChildAttribute;
+                                foreach (ColumnAttribute attr in attrs)
+                                {
+                                    if (attr != null)
+                                    {
+                                        Type propertyType;
+                                        if (prop.PropertyType.IsGenericType &&
+                                            prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                                        {
+                                            propertyType = prop.PropertyType.GetGenericArguments()[0];
+                                        }
+                                        else
+                                        {
+                                            propertyType = prop.PropertyType;
+                                        }
+                                        table.Columns.Add(new DataColumn(attr.Name, propertyType));
+                                        bulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(attr.Name, attr.Name));
+                                        columnNames.Add(prop.Name);
+                                    }
+                                }
+                                if (childAttrs != null)
+                                {
+                                    childBulkCopy.DestinationTableName = childAttrs.Name;
+                                    var childObject = prop.PropertyType;
+                                    Type childObjectType;
+                                    if (childObject.Name.Contains("ICollection"))
+                                    {
+                                        childObjectType = childObject.GetGenericArguments().FirstOrDefault();
+                                    }
+                                    else
+                                    {
+                                        childObjectType = childObject;
+                                    }
+                                    if (childObjectType != null)
+                                    {
+                                        string parentName = string.Empty;
+                                        PropertyInfo[] childProps = childObjectType.GetProperties();
+                                        foreach (PropertyInfo cProp in childProps)
+                                        {
+                                            object[] childAttributes = cProp.GetCustomAttributes(true);
+                                            var childsAttrs = childAttributes.Where(x => x.GetType() == typeof(ColumnAttribute)).ToList();
+                                            ForeignKeyAttribute parentAttrsName = childAttributes.FirstOrDefault(x => x.GetType() == typeof(ForeignKeyAttribute)) as ForeignKeyAttribute;
+                                            if (parentAttrsName != null)
+                                                parentName = parentAttrsName.Name;
+                                            foreach (ColumnAttribute cAttr in childsAttrs)
+                                            {
+                                                if (cAttr != null)
+                                                {
+                                                    Type propertyType;
+                                                    if (cProp.PropertyType.IsGenericType &&
+                                                        cProp.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                                                    {
+                                                        propertyType = cProp.PropertyType.GetGenericArguments()[0];
+                                                    }
+                                                    else
+                                                    {
+                                                        propertyType = cProp.PropertyType;
+                                                    }
+                                                    childTable.Columns.Add(new DataColumn(cAttr.Name, propertyType));
+                                                    childBulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(cAttr.Name, cAttr.Name));
+                                                    childColumnNames.Add(cProp.Name);
+                                                }
+                                            }
+                                        }
+                                        for (int ii = 0; ii < items.Count; ii++)
+                                        {
+                                            dynamic childItems = items[ii].GetType().GetProperty(prop.Name).GetValue(items[ii], null);
+                                            var isEnumerable = (childItems as System.Collections.IEnumerable) != null;
+                                            if (isEnumerable)
+                                            {
+                                                for (int i = 0; i < childItems.Count; i++)
+                                                {
+                                                    var dataItems = new List<object>();
+                                                    for (int j = 0; j < childColumnNames.Count; j++)
+                                                    {
+                                                        object value = null;
+                                                        if (parentName == childColumnNames[j])
+                                                        {
+                                                            PropertyInfo[] parentProps = items[ii].GetType().GetProperties();
+                                                            foreach (PropertyInfo pProp in parentProps)
+                                                            {
+                                                                object[] parentAttributes = pProp.GetCustomAttributes(true);
+                                                                var parentAttrs = parentAttributes.FirstOrDefault(x => x.GetType() == typeof(KeyAttribute));
+                                                                if (parentAttrs != null)
+                                                                {
+                                                                    value = items[ii].GetType().GetProperty(pProp.Name).GetValue(items[ii], null);
+                                                                }
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            value = childItems[i].GetType().GetProperty(childColumnNames[j]).GetValue(childItems[i], null);
+                                                        }
+
+                                                        if (value != null)
+                                                        {
+                                                            ////assign the value
+                                                            dataItems.Add(value);
+                                                        }
+                                                        else
+                                                        {
+                                                            dataItems.Add(DBNull.Value);
+                                                        }
+                                                    }
+                                                    childTable.Rows.Add(dataItems.ToArray());
+                                                }
+                                            }
+                                            else
+                                            {
+                                                var dataItems = new List<object>();
+                                                for (int j = 0; j < childColumnNames.Count; j++)
+                                                {
+                                                    object value = childItems.GetType().GetProperty(columnNames[j]).GetValue(childItems, null);
+                                                    if (value != null)
+                                                    {
+                                                        ////assign the value
+                                                        dataItems.Add(value);
+                                                    }
+                                                }
+                                                childTable.Rows.Add(dataItems.ToArray());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < items.Count; i++)
+                            {
+                                var dataItems = new List<object>();
+                                for (int j = 0; j < columnNames.Count; j++)
+                                {
+                                    object value = items[i].GetType().GetProperty(columnNames[j]).GetValue(items[i], null);
+                                    if (value != null)
+                                    {
+                                        ////assign the value
+                                        dataItems.Add(value);
+                                    }
+                                    else
+                                    {
+                                        dataItems.Add(DBNull.Value);
+                                    }
+                                }
+                                table.Rows.Add(dataItems.ToArray());
+                            }
+                            bulkCopy.WriteToServer(table);
+                            if (childTable.Rows.Count > 0)
+                                childBulkCopy.WriteToServer(childTable);
+                            tran.Commit();
                         }
-                        else
-                        {
-                            propertyType = prop.PropertyType;
-                        }
-                        primaryKeyName = columnAttrs.Name;
-                        keyName = prop.Name;
-                        break;
                     }
                 }
             }
-            var dataItems = dataList.ToList();
-            var idList = new List<object>();
-            for (int i = 0; i < dataItems.Count; i++)
-            {
-                object value = dataItems[i].GetType().GetProperty(keyName).GetValue(dataItems[i], null);
-                if (value != null)
-                {
-                    idList.Add(value);
-                }
-            }
-            var ids = "";
-
-            if (propertyType == typeof(int) || propertyType == typeof(decimal) || propertyType == typeof(float) || propertyType == typeof(double))
-            {
-                ids = string.Join(",", Array.ConvertAll(idList.ToArray(), i => i.ToString()));
-            }
-            else
-            {
-                ids = string.Join(",", Array.ConvertAll(idList.ToArray(), i => "'" + i.ToString() + "'"));
-            }
-
-            _database.ExecuteSqlCommand($"DELETE FROM {tableName} WHERE {primaryKeyName} in ({ids})");
         }
-
-        public void UpdateEntity<T>(IEnumerable<T> dataList, string tableName) where T : class
+        public void DeleteEntity<T>(IEnumerable<T> dataList, string tableName) where T : class
         {
             PropertyInfo[] props = typeof(T).GetProperties();
             Type propertyType = null;

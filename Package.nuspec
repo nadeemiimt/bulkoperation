@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>BulkPackage</id>
+    <version>6.0.0</version>
+    <title>BulkOperation</title>
+    <authors>Nadeem</authors>
+    <owners>Nadeem</owners>
+    <licenseUrl>https://github.com/nadeemiimt/bulkoperation</licenseUrl>
+    <projectUrl>https://github.com/nadeemiimt/bulkoperation</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Bulk insert and delete extension for visual studio.</description>
+    <releaseNotes>Bulk insert and delete extension for visual studio for Entity 6.0.0.0 version</releaseNotes>
+    <copyright>Copyright 2017</copyright>
+    <tags>bulkpackage Tag1 Tag2</tags>
+    <dependencies>
+      <dependency id="EntityFramework" version="6.0.0" />
+      <dependency id="System.ComponentModel.Annotations" version="4.0.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="ScpBulkOperation\ChildAttribute.cs" target="content\BulkOperation\ChildAttribute.cs"></file>
+    <file src="ScpBulkOperation\bin\debug\BulkOperation.dll" target="lib\net45\"></file>
+  </files>
+</package>
